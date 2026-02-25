@@ -18,10 +18,9 @@ Erebus Scanner is a high-performance, fully asynchronous port scanning and netwo
 ---
 
 ## Installation
-
 ### Prerequisites
-* Rust (Latest stable version)
-* Cargo (Rust package manager)
+* [**Rust (Latest stable version)**](https://www.rust-lang.org/tools/install)
+* [**Cargo (Rust package manager)**](https://doc.rust-lang.org/cargo/getting-started/installation.html)
 
 ### Build
 ```
