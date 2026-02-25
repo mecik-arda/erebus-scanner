@@ -2,8 +2,6 @@
 
 Erebus Scanner is a high-performance, fully asynchronous port scanning and network reconnaissance tool built with Rust and the Tokio runtime. Designed for speed, stealth, and modularity, it provides comprehensive insights into network security targets.
 
-Developed by Arda Meçik.
-
 ---
 
 ## Key Features
