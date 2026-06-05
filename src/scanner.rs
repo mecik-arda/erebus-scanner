@@ -74,8 +74,10 @@ pub async fn scan_port(
         ScanType::Udp => {
             let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
             socket.set_read_timeout(Some(timeout_dur)).ok();
-            let _ = socket.send_to(&[0; 0], addr);
-            let mut buf = [0; 1];
+            // DNS request packet as a more likely-to-respond probe payload
+            let dns_query = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01";
+            let _ = socket.send_to(dns_query, addr);
+            let mut buf = [0; 1024];
             match socket.recv_from(&mut buf) {
                 Ok(_) => ScanResult {
                     port,
@@ -84,9 +86,16 @@ pub async fn scan_port(
                     banner: None,
                     vulns: Vec::new(),
                 },
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => ScanResult {
+                    port,
+                    status: PortStatus::Filtered, // Could be open|filtered
+                    service: get_service_name(port),
+                    banner: None,
+                    vulns: Vec::new(),
+                },
                 Err(_) => ScanResult {
                     port,
-                    status: PortStatus::Filtered,
+                    status: PortStatus::Closed,
                     service: get_service_name(port),
                     banner: None,
                     vulns: Vec::new(),
@@ -94,7 +103,15 @@ pub async fn scan_port(
             }
         },
         ScanType::TcpSyn => {
-            unimplemented!("SYN scan requires raw socket privileges")
+            // Placeholder returning error-like result safely without panicking.
+            // Requires raw sockets to implement fully.
+            ScanResult {
+                port,
+                status: PortStatus::Filtered,
+                service: format!("{} (SYN unimplemented)", get_service_name(port)),
+                banner: None,
+                vulns: Vec::new(),
+            }
         }
     };
 

@@ -96,7 +96,7 @@ async fn run_scanner(cli: Cli) -> Result<()> {
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")?);
 
         let mut target_results = Vec::new();
-        let mut tasks = Vec::new();
+        let mut tasks = tokio::task::JoinSet::new();
 
         for &port in &current_ports {
             let sem_clone = Arc::clone(&sem);
@@ -105,7 +105,7 @@ async fn run_scanner(cli: Cli) -> Result<()> {
             let banner_flag = cli.banner;
             let proxy_addr = cli.proxy.clone();
 
-            tasks.push(tokio::spawn(async move {
+            tasks.spawn(async move {
                 let (mut res, _latency) = scan_port(ip, port, scan_type, timeout_val, sem_clone, proxy_addr).await;
                 if banner_flag && matches!(res.status, PortStatus::Open) {
                     if let Some(b) = banner::grab_banner(ip, port, timeout_val).await {
@@ -114,11 +114,11 @@ async fn run_scanner(cli: Cli) -> Result<()> {
                     }
                 }
                 res
-            }));
+            });
         }
 
-        for task in tasks {
-            if let Ok(res) = task.await {
+        while let Some(task_res) = tasks.join_next().await {
+            if let Ok(res) = task_res {
                 if matches!(res.status, PortStatus::Open) {
                     println!("{}: {} \t {}", 
                         res.port.to_string().green(), 
@@ -186,16 +186,25 @@ async fn run_scanner(cli: Cli) -> Result<()> {
 }
 
 fn parse_port_range(range: &str) -> Vec<u16> {
-    if let Ok(single) = range.parse::<u16>() {
-        return vec![single];
+    let mut ports = Vec::new();
+    for part in range.split(',') {
+        let part = part.trim();
+        if part.is_empty() { continue; }
+        let bounds: Vec<&str> = part.split('-').collect();
+        if bounds.len() == 2 {
+            let start = bounds[0].parse::<u16>().unwrap_or(1);
+            let end = bounds[1].parse::<u16>().unwrap_or(1024);
+            ports.extend(start..=end);
+        } else if let Ok(single) = part.parse::<u16>() {
+            ports.push(single);
+        }
     }
-    let parts: Vec<&str> = range.split('-').collect();
-    if parts.len() == 2 {
-        let start = parts[0].parse::<u16>().unwrap_or(1);
-        let end = parts[1].parse::<u16>().unwrap_or(1024);
-        return (start..=end).collect();
+    if ports.is_empty() {
+        return (1..=1024).collect();
     }
-    (1..=1024).collect()
+    ports.sort_unstable();
+    ports.dedup();
+    ports
 }
 
 #[tokio::main]

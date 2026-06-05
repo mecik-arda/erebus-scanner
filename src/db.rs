@@ -41,8 +41,9 @@ impl Database {
     pub fn get_last_scan_ports(&self, ip: &str) -> Result<Vec<u16>> {
         let mut stmt = self.conn.prepare(
             "SELECT port FROM scans 
-             WHERE ip = ?1 AND timestamp < CURRENT_TIMESTAMP 
-             ORDER BY timestamp DESC"
+             WHERE ip = ?1 AND timestamp = (
+                 SELECT MAX(timestamp) FROM scans WHERE ip = ?1 AND timestamp < CURRENT_TIMESTAMP
+             )"
         )?;
         let rows = stmt.query_map(params![ip], |row| row.get(0))?;
         let mut ports = Vec::new();
