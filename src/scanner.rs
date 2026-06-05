@@ -32,7 +32,7 @@ pub async fn scan_port(
     semaphore: Arc<Semaphore>,
     proxy_addr: Option<String>,
 ) -> (ScanResult, Duration) {
-    let _permit = semaphore.acquire().await.unwrap();
+    let _permit = semaphore.acquire().await.expect("Semaphore closed unexpectedly");
     let addr = SocketAddr::new(ip, port);
     let timeout_dur = Duration::from_millis(timeout_ms);
     let start_time = std::time::Instant::now();
@@ -72,7 +72,16 @@ pub async fn scan_port(
             }
         },
         ScanType::Udp => {
-            let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+            let socket = match UdpSocket::bind("0.0.0.0:0") {
+                Ok(s) => s,
+                Err(_) => return (ScanResult {
+                    port,
+                    status: PortStatus::Filtered,
+                    service: get_service_name(port),
+                    banner: None,
+                    vulns: Vec::new(),
+                }, start_time.elapsed()),
+            };
             socket.set_read_timeout(Some(timeout_dur)).ok();
             // DNS request packet as a more likely-to-respond probe payload
             let dns_query = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01";
